@@ -13,16 +13,21 @@ jobs:
 
       - name: Create .env file
         run: |
-          # Mengambil isi secret dan memasukkannya ke file .env
+          # Buat file .env di folder kerja runner dulu
           echo "${{ secrets.ENV_CONTENT }}" > .env
+
+      - name: Sync Code to aaPanel Folder
+        run: |
+          # PINDAHKAN kode dari folder runner ke folder aaPanel
+          # --delete bakal mastiin file yang kamu hapus di Git juga terhapus di server
+          sudo rsync -avz --delete --exclude '.git' ./ /www/wwwroot/tutorku-go-backend/
 
       - name: Deploy with Docker Compose
         run: |
-          # Build dan jalankan container di background
-          # --build memastikan perubahan kode Go kamu ikut ter-compile ke image baru
+          # PINDAH ke folder aaPanel baru jalankan docker
+          cd /www/wwwroot/tutorku-go-backend/
           docker compose up -d --build
 
       - name: Cleanup Old Images
         run: |
-          # Menghapus image lama (dangling) agar SSD Proxmox tidak penuh
           docker image prune -f
