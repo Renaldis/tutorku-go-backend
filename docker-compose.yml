@@ -11,14 +11,16 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     container_name: tutorku-postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_DB: tutorku_db
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
+      TZ: Asia/Jakarta
+      PGTZ: Asia/Jakarta
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
