@@ -28,3 +28,7 @@ func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 	err := r.db.First(&user, "id = ?", id).Error
 	return &user, err
 }
+
+func (r *UserRepository) Update(user *domain.User) error {
+	return r.db.Save(user).Error
+}

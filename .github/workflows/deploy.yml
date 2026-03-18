@@ -1,0 +1,23 @@
+name: Deploy Tutorku Backend (Docker)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy with Docker Compose
+        run: |
+          # Build dan jalankan container di background
+          # --build memastikan perubahan kode Go kamu ikut ter-compile ke image baru
+          docker compose up -d --build
+
+      - name: Cleanup Old Images
+        run: |
+          # Menghapus image lama (dangling) agar SSD Proxmox tidak penuh
+          docker image prune -f

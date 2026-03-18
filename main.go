@@ -38,12 +38,14 @@ func main() {
 	materialSvc := service.NewMaterialService(materialRepo, n8nClient)
 	chatSvc := service.NewChatService(chatRepo, materialRepo, n8nClient)
 	featureSvc := service.NewFeatureService(materialRepo, n8nClient)
+	userSvc := service.NewUserService(userRepo)
 
 	// Handlers
 	authH := handler.NewAuthHandler(authSvc)
 	materialH := handler.NewMaterialHandler(materialSvc)
 	chatH := handler.NewChatHandler(chatSvc)
 	featureH := handler.NewFeatureHandler(featureSvc)
+	userH := handler.NewUserHandler(userSvc)
 
 	if config.Cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -51,7 +53,7 @@ func main() {
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
-	routes.Setup(r, authH, materialH, chatH, featureH)
+	routes.Setup(r, authH, materialH, chatH, featureH, userH)
 
 	addr := fmt.Sprintf(":%s", config.Cfg.AppPort)
 	log.Printf("🚀 TutorKu Backend running on %s", addr)

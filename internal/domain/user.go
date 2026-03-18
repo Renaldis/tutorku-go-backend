@@ -31,3 +31,13 @@ type AuthResponse struct {
 	Token string `json:"token"`
 	User  User   `json:"user"`
 }
+
+type EditProfileRequest struct {
+	Name  string `json:"name,omitempty" binding:"omitempty,min=2"`
+	Email string `json:"email,omitempty" binding:"omitempty,email"`
+}
+type ChangePasswordRequest struct {
+	OldPassword     string `json:"old_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=NewPassword"`
+}

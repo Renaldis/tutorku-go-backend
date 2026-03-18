@@ -13,6 +13,7 @@ func Setup(
 	materialH *handler.MaterialHandler,
 	chatH *handler.ChatHandler,
 	featureH *handler.FeatureHandler,
+	userH *handler.UserHandler,
 ) {
 	// Tambahkan CORS di sini
 	r.Use(cors.New(cors.Config{
@@ -61,6 +62,13 @@ func Setup(
 			features.POST("/summarize", featureH.Summarize)
 			features.POST("/quiz", featureH.GenerateQuiz)
 			features.POST("/essay", featureH.EvaluateEssay)
+		}
+
+		users := protected.Group("/users")
+		{
+			users.PUT("/profile", userH.UpdateProfile)
+			users.PUT("/password", userH.ChangePassword)
+			users.GET("get-me", userH.GetMe)
 		}
 	}
 }
