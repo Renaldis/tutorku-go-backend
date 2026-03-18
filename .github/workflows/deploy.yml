@@ -20,7 +20,7 @@ jobs:
         run: |
           # PINDAHKAN kode dari folder runner ke folder aaPanel
           # --delete bakal mastiin file yang kamu hapus di Git juga terhapus di server
-          sudo rsync -avz --delete --exclude '.git' ./ /www/wwwroot/tutorku-go-backend/
+          sudo /usr/bin/rsync -avz --delete --exclude '.git' ./ /www/wwwroot/tutorku-go-backend/
 
       - name: Deploy with Docker Compose
         run: |
