@@ -11,6 +11,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Create .env file
+        run: |
+          # Mengambil isi secret dan memasukkannya ke file .env
+          echo "${{ secrets.ENV_CONTENT }}" > .env
+
       - name: Deploy with Docker Compose
         run: |
           # Build dan jalankan container di background
