@@ -46,6 +46,7 @@ func Setup(
 			materials.POST("/upload", materialH.Upload)
 			materials.GET("", materialH.GetAll)
 			materials.GET("/:id", materialH.GetById)
+			materials.GET("/:id/download", materialH.Download)
 			materials.GET("/:id/status", materialH.GetStatus)
 			materials.DELETE("/:id", materialH.Delete)
 		}

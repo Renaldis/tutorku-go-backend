@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/renaldis/tutorku-backend/internal/domain"
@@ -49,6 +50,25 @@ func (h *MaterialHandler) Upload(c *gin.Context) {
 	}
 
 	response.Created(c, "Materi sedang diproses", material)
+}
+
+func (h *MaterialHandler) Download(c *gin.Context) {
+	userID := c.GetString("user_id")
+	materialID := c.Param("id")
+
+	material, err := h.materialService.GetByID(materialID, userID)
+	if err != nil {
+		response.NotFound(c, err.Error())
+		return
+	}
+
+	filePath := "uploads/materials/" + material.ID + ".pdf"
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		response.NotFound(c, "File tidak ditemukan di server")
+		return
+	}
+
+	c.FileAttachment(filePath, material.Filename)
 }
 
 func (h *MaterialHandler) GetAll(c *gin.Context) {
