@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/renaldis/tutorku-backend/internal/domain"
@@ -33,6 +35,17 @@ func (s *MaterialService) Upload(userID, title, category, filename string, fileB
 
 	if err := s.materialRepo.Create(material); err != nil {
 		return nil, errors.New("gagal menyimpan materi")
+	}
+
+	// Save file locally for download
+	uploadDir := "uploads/materials"
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		log.Printf("❌ Gagal membuat direktori upload: %v", err)
+	} else {
+		filePath := filepath.Join(uploadDir, material.ID+".pdf")
+		if err := os.WriteFile(filePath, fileBytes, 0644); err != nil {
+			log.Printf("❌ Gagal menyimpan file secara lokal: %v", err)
+		}
 	}
 
 	// Kirim ke n8n secara async
