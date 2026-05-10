@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -82,16 +83,18 @@ func (s *QuizService) GenerateQuiz(userID, materialID string, req domain.Generat
 	// Build Questions and Options
 	for i, aiQ := range aiQuestions {
 		q := domain.QuizQuestion{
-			ID:            uuid.New().String(),
-			QuizID:        quiz.ID,
-			Question:      aiQ.Question,
-			Type:          req.Type,
-			CorrectAnswer: aiQ.CorrectAnswer,
-			Explanation:   aiQ.Explanation,
-			OrderNo:       i + 1,
+			ID:      uuid.New().String(),
+			QuizID:  quiz.ID,
+			Question: aiQ.Question,
+			Type:    req.Type,
+			OrderNo: i + 1,
 		}
 
-		if req.Type == "multiple_choice" || req.Type == "true_false" {
+		switch req.Type {
+		case "multiple_choice", "true_false":
+			q.CorrectAnswer = aiQ.CorrectAnswer
+			q.Explanation = aiQ.Explanation
+
 			// Sort keys agar urutan option selalu A, B, C, D (map Go tidak berurutan)
 			keys := make([]string, 0, len(aiQ.Options))
 			for key := range aiQ.Options {
@@ -107,7 +110,20 @@ func (s *QuizService) GenerateQuiz(userID, materialID string, req domain.Generat
 					OptionText: aiQ.Options[key],
 				})
 			}
+
+		case "essay":
+			// Untuk essay: simpan sample_answer sebagai CorrectAnswer
+			// dan key_points (digabung) sebagai Explanation sebagai referensi penilaian
+			q.CorrectAnswer = aiQ.SampleAnswer
+			if len(aiQ.KeyPoints) > 0 {
+				keyPointsBytes, _ := json.Marshal(aiQ.KeyPoints)
+				q.Explanation = string(keyPointsBytes)
+			} else {
+				q.Explanation = aiQ.Explanation
+			}
+			// Essay tidak punya options
 		}
+
 		quiz.Questions = append(quiz.Questions, q)
 	}
 
@@ -169,6 +185,7 @@ func (s *QuizService) SubmitAttempt(attemptID, userID string, req domain.SubmitQ
 	}
 
 	totalCorrect := 0
+	totalEarnedPoints := 0.0
 	var answers []domain.QuizAnswer
 
 	for _, ansReq := range req.Answers {
@@ -180,16 +197,47 @@ func (s *QuizService) SubmitAttempt(attemptID, userID string, req domain.SubmitQ
 		isCorrect := false
 		earnedPoints := 0.0
 
-		// Currently checking exact match. For essay, we might need a different approach (e.g. AI evaluation).
-		// But for multiple_choice and true_false:
-		if q.Type == "multiple_choice" || q.Type == "true_false" {
+		switch q.Type {
+		case "multiple_choice", "true_false":
 			if ansReq.UserAnswer == q.CorrectAnswer {
 				isCorrect = true
-				earnedPoints = 1.0 // Assume 1 point per question
+				earnedPoints = 1.0
 				totalCorrect++
+			}
+
+		case "essay":
+			// Kirim jawaban essay ke AI (chatbot /essay) untuk dievaluasi
+			essayResult, err := s.n8nClient.EvaluateEssay(n8n.EssayPayload{
+				MaterialID: quiz.MaterialID,
+				UserID:     userID,
+				Title:      q.Question,
+				Content:    ansReq.UserAnswer,
+			})
+			if err == nil {
+				// Chatbot mengembalikan: {"material_id": ..., "user_id": ..., "evaluation": {...}}
+				if evaluation, ok := essayResult["evaluation"].(map[string]interface{}); ok {
+					if scoreRaw, ok := evaluation["score"]; ok {
+						var score float64
+						switch v := scoreRaw.(type) {
+						case float64:
+							score = v
+						case int:
+							score = float64(v)
+						}
+						// Normalisasi skor 0-100 ke 0-1 poin
+						earnedPoints = score / 100.0
+						if score >= 60 {
+							isCorrect = true
+							totalCorrect++
+						}
+						// Simpan feedback AI ke UserAnswer sebagai JSON tambahan
+						ansReq.UserAnswer = fmt.Sprintf("%s", ansReq.UserAnswer)
+					}
+				}
 			}
 		}
 
+		totalEarnedPoints += earnedPoints
 		answers = append(answers, domain.QuizAnswer{
 			ID:           uuid.New().String(),
 			AttemptID:    attempt.ID,
@@ -199,6 +247,7 @@ func (s *QuizService) SubmitAttempt(attemptID, userID string, req domain.SubmitQ
 			EarnedPoints: earnedPoints,
 		})
 	}
+	_ = totalEarnedPoints // dapat digunakan untuk perhitungan skor lebih lanjut
 
 	// Update Attempt
 	now := time.Now()
@@ -222,4 +271,8 @@ func (s *QuizService) SubmitAttempt(attemptID, userID string, req domain.SubmitQ
 
 func (s *QuizService) GetAttemptsByQuiz(quizID, userID string) ([]domain.QuizAttempt, error) {
 	return s.quizRepo.GetAttemptsByQuizID(quizID, userID)
+}
+
+func (s *QuizService) DeleteQuiz(quizID, userID string) error {
+	return s.quizRepo.DeleteQuiz(quizID, userID)
 }

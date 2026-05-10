@@ -71,12 +71,14 @@ func Setup(
 			users.PUT("/profile", userH.UpdateProfile)
 			users.PUT("/password", userH.ChangePassword)
 			users.GET("get-me", userH.GetMe)
+			users.GET("/stats", userH.GetStats)
 		}
 
 		quizzes := protected.Group("/quizzes")
 		{
 			quizzes.GET("/:id", quizH.GetQuiz)
 			quizzes.POST("/:id/start", quizH.StartAttempt)
+			quizzes.DELETE("/:id", quizH.DeleteQuiz)
 			quizzes.POST("/attempt/:attempt_id/submit", quizH.SubmitAttempt)
 			quizzes.GET("/:id/attempts", quizH.GetAttemptsByQuiz)
 		}

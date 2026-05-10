@@ -104,3 +104,16 @@ func (h *QuizHandler) GetAttemptsByQuiz(c *gin.Context) {
 
 	response.OK(c, "success", attempts)
 }
+
+func (h *QuizHandler) DeleteQuiz(c *gin.Context) {
+	userID := c.GetString("user_id")
+	quizID := c.Param("id")
+
+	if err := h.quizService.DeleteQuiz(quizID, userID); err != nil {
+		response.NotFound(c, "Kuis tidak ditemukan atau tidak punya akses")
+		return
+	}
+
+	response.OK(c, "Kuis berhasil dihapus", nil)
+}
+

@@ -36,8 +36,19 @@ type EditProfileRequest struct {
 	Name  string `json:"name,omitempty" binding:"omitempty,min=2"`
 	Email string `json:"email,omitempty" binding:"omitempty,email"`
 }
+
 type ChangePasswordRequest struct {
 	OldPassword     string `json:"old_password" binding:"required"`
 	NewPassword     string `json:"new_password" binding:"required,min=6"`
 	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=NewPassword"`
+}
+
+type UserStats struct {
+	TotalMaterials int64   `json:"total_materials"`
+	TotalQuizzes   int64   `json:"total_quizzes"`
+	TotalAttempts  int64   `json:"total_attempts"`
+	AverageScore   float64 `json:"average_score"`
+	BestScore      float64 `json:"best_score"`
+	TotalCorrect   int64   `json:"total_correct"`
+	TotalQuestions int64   `json:"total_questions"`
 }

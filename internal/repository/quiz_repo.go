@@ -31,7 +31,7 @@ func (r *QuizRepository) GetQuizByID(quizID, userID string) (*domain.Quiz, error
 
 func (r *QuizRepository) GetQuizzesByMaterialID(materialID, userID string) ([]domain.Quiz, error) {
 	var quizzes []domain.Quiz
-	err := r.db.Where("material_id = ? AND user_id = ?", materialID, userID).
+	err := r.db.Preload("Questions").Where("material_id = ? AND user_id = ?", materialID, userID).
 		Order("created_at desc").
 		Find(&quizzes).Error
 	return quizzes, err
@@ -65,3 +65,15 @@ func (r *QuizRepository) GetAttemptsByQuizID(quizID, userID string) ([]domain.Qu
 		Find(&attempts).Error
 	return attempts, err
 }
+
+func (r *QuizRepository) DeleteQuiz(quizID, userID string) error {
+	result := r.db.Where("id = ? AND user_id = ?", quizID, userID).Delete(&domain.Quiz{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
