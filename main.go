@@ -29,6 +29,7 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	materialRepo := repository.NewMaterialRepository(db)
 	chatRepo := repository.NewChatRepository(db)
+	quizRepo := repository.NewQuizRepository(db)
 
 	// n8n
 	n8nClient := n8n.NewClient()
@@ -39,6 +40,7 @@ func main() {
 	chatSvc := service.NewChatService(chatRepo, materialRepo, n8nClient)
 	featureSvc := service.NewFeatureService(materialRepo, n8nClient)
 	userSvc := service.NewUserService(userRepo)
+	quizSvc := service.NewQuizService(quizRepo, materialRepo, n8nClient)
 
 	// Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -46,6 +48,7 @@ func main() {
 	chatH := handler.NewChatHandler(chatSvc)
 	featureH := handler.NewFeatureHandler(featureSvc)
 	userH := handler.NewUserHandler(userSvc)
+	quizH := handler.NewQuizHandler(quizSvc)
 
 	if config.Cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -53,7 +56,7 @@ func main() {
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
-	routes.Setup(r, authH, materialH, chatH, featureH, userH)
+	routes.Setup(r, authH, materialH, chatH, featureH, userH, quizH)
 
 	addr := fmt.Sprintf(":%s", config.Cfg.AppPort)
 	log.Printf("🚀 TutorKu Backend running on %s", addr)
@@ -67,6 +70,11 @@ func runMigrations(db *gorm.DB) {
 		&domain.Material{},
 		&domain.ChatSession{},
 		&domain.ChatMessage{},
+		&domain.Quiz{},
+		&domain.QuizQuestion{},
+		&domain.QuizOption{},
+		&domain.QuizAttempt{},
+		&domain.QuizAnswer{},
 	)
 	log.Println("✅ Migration completed!")
 }

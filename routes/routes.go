@@ -14,6 +14,7 @@ func Setup(
 	chatH *handler.ChatHandler,
 	featureH *handler.FeatureHandler,
 	userH *handler.UserHandler,
+	quizH *handler.QuizHandler,
 ) {
 	// Tambahkan CORS di sini
 	r.Use(cors.New(cors.Config{
@@ -71,5 +72,18 @@ func Setup(
 			users.PUT("/password", userH.ChangePassword)
 			users.GET("get-me", userH.GetMe)
 		}
+
+		quizzes := protected.Group("/quizzes")
+		{
+			quizzes.GET("/:id", quizH.GetQuiz)
+			quizzes.POST("/:id/start", quizH.StartAttempt)
+			quizzes.POST("/attempt/:attempt_id/submit", quizH.SubmitAttempt)
+			quizzes.GET("/:id/attempts", quizH.GetAttemptsByQuiz)
+		}
+
+		// Move generate quiz inside material or quizzes
+		// The requirement states: POST /materials/:id/generate-quiz
+		materials.POST("/:id/generate-quiz", quizH.GenerateQuiz)
+		materials.GET("/:id/quizzes", quizH.GetQuizzesByMaterial)
 	}
 }

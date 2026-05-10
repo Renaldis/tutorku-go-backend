@@ -47,21 +47,30 @@ tutorku-backend/
 │   ├── domain/                # Struct model + request/response types
 │   │   ├── user.go
 │   │   ├── material.go
-│   │   └── chat.go
+│   │   ├── chat.go
+│   │   ├── feature.go
+│   │   ├── quiz.go
+│   │   ├── quiz_answer.go
+│   │   └── quiz_attempt.go
 │   ├── repository/            # Database access layer (GORM queries)
 │   │   ├── user_repo.go
 │   │   ├── material_repo.go
-│   │   └── chat_repo.go
+│   │   ├── chat_repo.go
+│   │   └── quiz_repo.go
 │   ├── service/               # Business logic layer
 │   │   ├── auth_service.go
+│   │   ├── user_service.go
 │   │   ├── material_service.go
 │   │   ├── chat_service.go
-│   │   └── feature_service.go
+│   │   ├── feature_service.go
+│   │   └── quiz_service.go
 │   └── handler/               # HTTP handler layer (gin context)
 │       ├── auth_handler.go
+│       ├── user_handler.go
 │       ├── material_handler.go
 │       ├── chat_handler.go
-│       └── feature_handler.go
+│       ├── feature_handler.go
+│       └── quiz_handler.go
 └── pkg/
     ├── n8n/
     │   └── client.go          # HTTP client untuk memanggil n8n webhooks
@@ -119,6 +128,64 @@ tutorku-backend/
 | `content`    | text                      | Isi pesan               |
 | `created_at` | timestamp                 |                         |
 
+### `quizzes`
+
+| Field          | Type                  | Keterangan                        |
+| -------------- | --------------------- | --------------------------------- |
+| `id`           | UUID (PK)             |                                   |
+| `user_id`      | UUID (FK → users)     | Owner kuis                        |
+| `material_id`  | UUID (FK → materials) | Referensi materi                  |
+| `title`        | string                | Judul kuis                        |
+| `description`  | text                  | Deskripsi kuis                    |
+| `generated_by` | string                | AI model / generator name         |
+| `created_at`   | timestamp             |                                   |
+| `deleted_at`   | timestamp             | Soft delete                       |
+
+### `quiz_questions`
+
+| Field            | Type      | Keterangan                               |
+| ---------------- | --------- | ---------------------------------------- |
+| `id`             | UUID (PK) |                                          |
+| `quiz_id`        | UUID (FK) |                                          |
+| `question`       | text      | Isi pertanyaan                           |
+| `type`           | string    | `multiple_choice`, `true_false`, `essay` |
+| `correct_answer` | string    | Jawaban benar                            |
+| `explanation`    | text      | Penjelasan jawaban benar                 |
+| `order_no`       | int       | Urutan soal                              |
+
+### `quiz_options`
+
+| Field         | Type      | Keterangan                  |
+| ------------- | --------- | --------------------------- |
+| `id`          | UUID (PK) |                             |
+| `question_id` | UUID (FK) |                             |
+| `option_key`  | string    | A, B, C, D atau True, False |
+| `option_text` | text      | Teks pilihan ganda          |
+
+### `quiz_attempts`
+
+| Field             | Type      | Keterangan         |
+| ----------------- | --------- | ------------------ |
+| `id`              | UUID (PK) |                    |
+| `user_id`         | UUID (FK) |                    |
+| `quiz_id`         | UUID (FK) |                    |
+| `score`           | float     | Nilai kuis         |
+| `total_correct`   | int       | Jumlah benar       |
+| `total_questions` | int       | Total soal         |
+| `started_at`      | timestamp | Waktu mulai kuis   |
+| `finished_at`     | timestamp | Waktu selesai kuis |
+
+### `quiz_answers`
+
+| Field           | Type      | Keterangan        |
+| --------------- | --------- | ----------------- |
+| `id`            | UUID (PK) |                   |
+| `attempt_id`    | UUID (FK) |                   |
+| `question_id`   | UUID (FK) |                   |
+| `user_answer`   | text      | Jawaban dari user |
+| `is_correct`    | boolean   |                   |
+| `earned_points` | float     |                   |
+
 ---
 
 ## 🔗 API Endpoints
@@ -153,6 +220,25 @@ Base URL: `/api/v1`
 | `POST` | `/chat`                     | Kirim pertanyaan ke AI (RAG)        |
 | `GET`  | `/chat/sessions`            | Ambil semua sesi chat milik user    |
 | `GET`  | `/chat/history/:session_id` | Ambil riwayat pesan dalam satu sesi |
+
+#### Users
+
+| Method | Endpoint          | Deskripsi               |
+| ------ | ----------------- | ----------------------- |
+| `GET`  | `/users/get-me`   | Ambil data profile diri |
+| `PUT`  | `/users/profile`  | Update profile          |
+| `PUT`  | `/users/password` | Ubah password           |
+
+#### Quizzes (New AI Quiz System)
+
+| Method | Endpoint                              | Deskripsi                           |
+| ------ | ------------------------------------- | ----------------------------------- |
+| `POST` | `/materials/:id/generate-quiz`        | Generate kuis via AI dan simpan     |
+| `GET`  | `/materials/:id/quizzes`              | Ambil daftar kuis dari suatu materi |
+| `GET`  | `/quizzes/:id`                        | Ambil detail kuis dan soal-soalnya  |
+| `POST` | `/quizzes/:id/start`                  | Mulai pengerjaan kuis (attempt)     |
+| `POST` | `/quizzes/attempt/:attempt_id/submit` | Submit jawaban dan hitung skor      |
+| `GET`  | `/quizzes/:id/attempts`               | Riwayat pengerjaan suatu kuis       |
 
 #### Features (AI)
 
@@ -228,23 +314,40 @@ Client → POST /features/summarize { material_id, mode: "short"|"detailed"|"min
          → n8n: retrieve content → LLM summarize → return result
 ```
 
-### 5. Generate Kuis
+### 5. Generate Kuis (New System)
 
 ```
-Client → POST /features/quiz { material_id, type, count, difficulty }
+Client → POST /materials/:id/generate-quiz { type, count, difficulty }
   → [AuthMiddleware]
-  → FeatureHandler.GenerateQuiz()
-  → FeatureService.GenerateQuiz()
+  → QuizHandler.GenerateQuiz()
+  → QuizService.GenerateQuiz()
     ├─ Validasi: material milik user & status == "ready"
-    └─ n8nClient.GenerateQuiz()
-         → POST ke n8n webhook "quiz"
-           Payload: { material_id, user_id, type, count, difficulty }
-         → n8n: generate questions via LLM → return quiz data
+    ├─ n8nClient.GenerateQuiz()
+    │    → POST ke n8n webhook "quiz"
+    │    → n8n: generate questions via LLM → return quiz data (JSON)
+    └─ Backend memvalidasi JSON dan menyimpannya secara persisten ke DB:
+         → Simpan ke tabel `quizzes`
+         → Simpan ke tabel `quiz_questions`
+         → Simpan ke tabel `quiz_options`
 ```
 
 **type**: `multiple_choice` | `essay` | `true_false`  
 **difficulty**: `easy` | `medium` | `hard`  
 **count**: 1–20
+
+### 5.1. Mengerjakan Kuis
+
+```
+Client → POST /quizzes/:id/start 
+  → Buat record `QuizAttempt` di DB (started_at dicatat)
+  → Return ID attempt
+
+Client → POST /quizzes/attempt/:attempt_id/submit { answers: [...] }
+  → Validasi jawaban user terhadap `correct_answer` di DB
+  → Simpan hasil tiap jawaban ke `quiz_answers`
+  → Hitung total_correct dan score, catat `finished_at` di `quiz_attempts`
+  → Return hasil skor akhir ke user
+```
 
 ### 6. Evaluasi Esai
 
