@@ -101,3 +101,14 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	// Karena tidak ada data yang perlu dikembalikan, parameter data diisi nil
 	response.OK(c, "Password berhasil diubah", nil)
 }
+
+func (h *UserHandler) GetStats(c *gin.Context) {
+	userID := c.GetString("user_id")
+	stats, err := h.userService.GetStats(userID)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	response.OK(c, "success", stats)
+}
+

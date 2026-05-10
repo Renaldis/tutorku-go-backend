@@ -83,3 +83,8 @@ func (s *UserService) ChangePassword(userID string, req *domain.ChangePasswordRe
 
 	return nil
 }
+
+func (s *UserService) GetStats(userID string) (*domain.UserStats, error) {
+	return s.userRepo.GetStats(userID)
+}
+
