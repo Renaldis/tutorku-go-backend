@@ -9,6 +9,8 @@ services:
         condition: service_healthy
     env_file: .env
     restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
 
   postgres:
     image: postgres:16
@@ -32,3 +34,4 @@ services:
 
 volumes:
   pgdata:
+  uploads_data:
