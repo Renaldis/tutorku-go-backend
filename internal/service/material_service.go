@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/renaldis/tutorku-backend/internal/domain"
@@ -23,12 +25,21 @@ func NewMaterialService(materialRepo *repository.MaterialRepository, n8nClient *
 }
 
 func (s *MaterialService) Upload(userID, title, category, filename string, fileBytes []byte, fileSize int64) (*domain.Material, error) {
+	// Decode URL-encoded string (misal: "materi%20dbms.pdf" -> "materi dbms.pdf")
+	decodedFilename, err := url.QueryUnescape(filename)
+	if err != nil {
+		decodedFilename = filename // fallback jika gagal decode
+	}
+
+	// Sanitasi nama file: ubah spasi jadi dash (-) dan jadikan huruf kecil semua
+	safeFilename := strings.ToLower(strings.ReplaceAll(decodedFilename, " ", "-"))
+
 	material := &domain.Material{
 		ID:       uuid.New().String(),
 		UserID:   userID,
 		Title:    title,
 		Category: category,
-		Filename: filename,
+		Filename: safeFilename,
 		FileSize: fileSize,
 		Status:   domain.StatusProcessing,
 	}
@@ -56,7 +67,7 @@ func (s *MaterialService) Upload(userID, title, category, filename string, fileB
 			MaterialID: material.ID,
 			UserID:     userID,
 			FileBase64: fileBase64,
-			Filename:   filename,
+			Filename:   safeFilename,
 		})
 
 		if err != nil {

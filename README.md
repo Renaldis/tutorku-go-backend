@@ -137,12 +137,14 @@ Base URL: `/api/v1`
 
 #### Materials
 
-| Method   | Endpoint                | Deskripsi                             |
-| -------- | ----------------------- | ------------------------------------- |
-| `POST`   | `/materials/upload`     | Upload file PDF (multipart/form-data) |
-| `GET`    | `/materials`            | Ambil semua materi milik user         |
-| `GET`    | `/materials/:id/status` | Cek status processing materi          |
-| `DELETE` | `/materials/:id`        | Hapus materi                          |
+| Method   | Endpoint                  | Deskripsi                             |
+| -------- | ------------------------- | ------------------------------------- |
+| `POST`   | `/materials/upload`       | Upload file PDF (multipart/form-data) |
+| `GET`    | `/materials`              | Ambil semua materi milik user         |
+| `GET`    | `/materials/:id`          | Ambil detail materi                   |
+| `GET`    | `/materials/:id/status`   | Cek status processing materi          |
+| `GET`    | `/materials/:id/download` | Download materi PDF                   |
+| `DELETE` | `/materials/:id`          | Hapus materi                          |
 
 #### Chat
 
@@ -288,24 +290,28 @@ N8N_WEBHOOK_ESSAY=/webhook/bbb
 ## 🔑 Environment Variables
 
 ```env
+# App
 APP_PORT=8080
-APP_ENV=development           # production → gin.ReleaseMode
+APP_ENV=development
 
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=tutorku_db
-DB_USER=root
-DB_PASS=password
+# Database
+DB_HOST=
+DB_PORT=
+DB_NAME=
+DB_USER=
+DB_PASS=
 
-JWT_SECRET=your_secret_key
-JWT_EXPIRES_HOUR=72           # default 72 jam
+# JWT
+JWT_SECRET=your-super-secret-key-here
+JWT_EXPIRES_HOUR=72
 
-N8N_BASE_URL=http://localhost:5678
-N8N_WEBHOOK_INGEST=/webhook/ingest
-N8N_WEBHOOK_CHAT=/webhook/chat
-N8N_WEBHOOK_SUMMARIZE=/webhook/summarize
-N8N_WEBHOOK_QUIZ=/webhook/quiz
-N8N_WEBHOOK_ESSAY=/webhook/essay
+# n8n
+N8N_BASE_URL=
+N8N_WEBHOOK_INGEST=/pdf-ingest
+N8N_WEBHOOK_CHAT=/rag-chat
+N8N_WEBHOOK_SUMMARIZE=/summarize
+N8N_WEBHOOK_QUIZ=/quiz
+N8N_WEBHOOK_ESSAY=/essay
 ```
 
 ---
