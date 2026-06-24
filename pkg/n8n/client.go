@@ -39,6 +39,10 @@ func (c *Client) post(webhook string, payload interface{}) (map[string]interface
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("webhook %s gagal dengan status %d: %s", webhook, resp.StatusCode, string(respBody))
+	}
+
 	var result map[string]interface{}
 	json.Unmarshal(respBody, &result)
 	return result, nil

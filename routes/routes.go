@@ -49,6 +49,7 @@ func Setup(
 			materials.GET("/:id", materialH.GetById)
 			materials.GET("/:id/download", materialH.Download)
 			materials.GET("/:id/status", materialH.GetStatus)
+			materials.POST("/:id/reprocess", materialH.Reprocess)
 			materials.DELETE("/:id", materialH.Delete)
 		}
 

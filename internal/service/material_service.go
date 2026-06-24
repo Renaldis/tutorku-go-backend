@@ -59,25 +59,35 @@ func (s *MaterialService) Upload(userID, title, category, filename string, fileB
 		}
 	}
 
-	// Kirim ke n8n secara async
-	go func() {
-		fileBase64 := base64.StdEncoding.EncodeToString(fileBytes)
-		log.Printf("🚀 Sending to n8n: material_id=%s", material.ID)
-		result, err := s.n8nClient.TriggerIngestion(n8n.IngestPayload{
-			MaterialID: material.ID,
-			UserID:     userID,
-			FileBase64: fileBase64,
-			Filename:   safeFilename,
-		})
-
-		if err != nil {
-			log.Printf("❌ n8n error: %v", err)
-			return
-		}
-		log.Printf("✅ n8n response: %v", result)
-	}()
+	// Kirim ke layanan AI secara async agar upload tidak menunggu proses RAG selesai.
+	go s.processIngestion(material.ID, userID, safeFilename, fileBytes)
 
 	return material, nil
+}
+
+func (s *MaterialService) processIngestion(materialID, userID, filename string, fileBytes []byte) {
+	fileBase64 := base64.StdEncoding.EncodeToString(fileBytes)
+	log.Printf("🚀 Sending to n8n: material_id=%s", materialID)
+
+	result, err := s.n8nClient.TriggerIngestion(n8n.IngestPayload{
+		MaterialID: materialID,
+		UserID:     userID,
+		FileBase64: fileBase64,
+		Filename:   filename,
+	})
+
+	if err != nil {
+		log.Printf("❌ n8n error: %v", err)
+		if updateErr := s.materialRepo.UpdateStatus(materialID, domain.StatusFailed); updateErr != nil {
+			log.Printf("❌ Gagal mengubah status material menjadi failed: %v", updateErr)
+		}
+		return
+	}
+
+	if updateErr := s.materialRepo.UpdateStatus(materialID, domain.StatusReady); updateErr != nil {
+		log.Printf("❌ Gagal mengubah status material menjadi ready: %v", updateErr)
+	}
+	log.Printf("✅ n8n response: %v", result)
 }
 
 func (s *MaterialService) GetByUser(userID string) ([]domain.Material, error) {
@@ -86,6 +96,28 @@ func (s *MaterialService) GetByUser(userID string) ([]domain.Material, error) {
 
 func (s *MaterialService) GetByID(id, userID string) (*domain.Material, error) {
 	return s.materialRepo.FindByID(id, userID)
+}
+
+func (s *MaterialService) Reprocess(id, userID string) (*domain.Material, error) {
+	material, err := s.materialRepo.FindByID(id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	filePath := filepath.Join("uploads/materials", material.ID+".pdf")
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, errors.New("file PDF tidak ditemukan di server")
+	}
+
+	if err := s.materialRepo.UpdateStatus(material.ID, domain.StatusProcessing); err != nil {
+		return nil, errors.New("gagal mengubah status materi")
+	}
+	material.Status = domain.StatusProcessing
+
+	go s.processIngestion(material.ID, userID, material.Filename, fileBytes)
+
+	return material, nil
 }
 
 func (s *MaterialService) UpdateStatus(id string, status domain.MaterialStatus) error {

@@ -104,6 +104,19 @@ func (h *MaterialHandler) GetStatus(c *gin.Context) {
 	response.OK(c, "success", gin.H{"status": material.Status})
 }
 
+func (h *MaterialHandler) Reprocess(c *gin.Context) {
+	userID := c.GetString("user_id")
+	materialID := c.Param("id")
+
+	material, err := h.materialService.Reprocess(materialID, userID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, "Materi diproses ulang", material)
+}
+
 func (h *MaterialHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	materialID := c.Param("id")
