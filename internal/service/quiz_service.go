@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +27,113 @@ func NewQuizService(quizRepo *repository.QuizRepository, materialRepo *repositor
 		materialRepo: materialRepo,
 		n8nClient:    n8nClient,
 	}
+}
+
+type quizOptionCandidate struct {
+	key       string
+	text      string
+	isCorrect bool
+}
+
+var quizOptionLabels = []string{"A", "B", "C", "D"}
+
+func normalizeOptionKey(value string) string {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+
+	for _, label := range quizOptionLabels {
+		if value == label || strings.HasPrefix(value, label+".") || strings.HasPrefix(value, label+")") {
+			return label
+		}
+	}
+
+	first := value[:1]
+	for _, label := range quizOptionLabels {
+		if first == label {
+			return label
+		}
+	}
+
+	return ""
+}
+
+func buildSortedOptions(questionID string, options map[string]string) []domain.QuizOption {
+	keys := make([]string, 0, len(options))
+	for key := range options {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	quizOptions := make([]domain.QuizOption, 0, len(keys))
+	for _, key := range keys {
+		quizOptions = append(quizOptions, domain.QuizOption{
+			ID:         uuid.New().String(),
+			QuestionID: questionID,
+			OptionKey:  key,
+			OptionText: options[key],
+		})
+	}
+
+	return quizOptions
+}
+
+func shuffleMultipleChoiceOptions(questionID string, aiQ domain.AIQuizQuestion) ([]domain.QuizOption, string) {
+	correctKey := normalizeOptionKey(aiQ.CorrectAnswer)
+	keys := make([]string, 0, len(aiQ.Options))
+	for key := range aiQ.Options {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	candidates := make([]quizOptionCandidate, 0, len(keys))
+	foundCorrect := false
+	for _, key := range keys {
+		normalizedKey := normalizeOptionKey(key)
+		isCorrect := normalizedKey == correctKey
+		if isCorrect {
+			foundCorrect = true
+		}
+
+		candidates = append(candidates, quizOptionCandidate{
+			key:       normalizedKey,
+			text:      aiQ.Options[key],
+			isCorrect: isCorrect,
+		})
+	}
+
+	// Jika kunci jawaban dari AI tidak bisa dipetakan, pertahankan urutan asli
+	// agar tidak berisiko mengubah jawaban benar menjadi salah.
+	if !foundCorrect {
+		return buildSortedOptions(questionID, aiQ.Options), aiQ.CorrectAnswer
+	}
+
+	rand.Shuffle(len(candidates), func(i, j int) {
+		candidates[i], candidates[j] = candidates[j], candidates[i]
+	})
+
+	quizOptions := make([]domain.QuizOption, 0, len(candidates))
+	newCorrectAnswer := correctKey
+	for i, candidate := range candidates {
+		if i >= len(quizOptionLabels) {
+			break
+		}
+
+		newKey := quizOptionLabels[i]
+		if candidate.isCorrect {
+			newCorrectAnswer = newKey
+		}
+
+		quizOptions = append(quizOptions, domain.QuizOption{
+			ID:         uuid.New().String(),
+			QuestionID: questionID,
+			OptionKey:  newKey,
+			OptionText: candidate.text,
+		})
+	}
+
+	return quizOptions, newCorrectAnswer
 }
 
 func (s *QuizService) GenerateQuiz(userID, materialID string, req domain.GenerateQuizRequest) (*domain.Quiz, error) {
@@ -83,33 +192,22 @@ func (s *QuizService) GenerateQuiz(userID, materialID string, req domain.Generat
 	// Build Questions and Options
 	for i, aiQ := range aiQuestions {
 		q := domain.QuizQuestion{
-			ID:      uuid.New().String(),
-			QuizID:  quiz.ID,
+			ID:       uuid.New().String(),
+			QuizID:   quiz.ID,
 			Question: aiQ.Question,
-			Type:    req.Type,
-			OrderNo: i + 1,
+			Type:     req.Type,
+			OrderNo:  i + 1,
 		}
 
 		switch req.Type {
-		case "multiple_choice", "true_false":
+		case "multiple_choice":
+			q.Explanation = aiQ.Explanation
+			q.Options, q.CorrectAnswer = shuffleMultipleChoiceOptions(q.ID, aiQ)
+
+		case "true_false":
 			q.CorrectAnswer = aiQ.CorrectAnswer
 			q.Explanation = aiQ.Explanation
-
-			// Sort keys agar urutan option selalu A, B, C, D (map Go tidak berurutan)
-			keys := make([]string, 0, len(aiQ.Options))
-			for key := range aiQ.Options {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-
-			for _, key := range keys {
-				q.Options = append(q.Options, domain.QuizOption{
-					ID:         uuid.New().String(),
-					QuestionID: q.ID,
-					OptionKey:  key,
-					OptionText: aiQ.Options[key],
-				})
-			}
+			q.Options = buildSortedOptions(q.ID, aiQ.Options)
 
 		case "essay":
 			// Untuk essay: simpan sample_answer sebagai CorrectAnswer
